@@ -16,7 +16,7 @@ from schedule import Schedule
 #   Написать аннотации, комментарии
 #   Заменить фильтр any_record на что-нибудь нормальное
 #   Добавить использование множеств
-#   Поправить, что дату брони надо хранить в словаре с id чата
+#   Поправить, что дату брони надо хранить в словаре с id чата (Только протестировать)
 
 
 with open("config.txt", "r") as f:  # Получение токена бота
@@ -25,7 +25,6 @@ with open("config.txt", "r") as f:  # Получение токена бота
 
 dp = Dispatcher()  # Обработчик пришедших сообщений
 schedule = Schedule("schedule.json")  # Класс для работы с расписанием, в том числе бронирования
-
 
 
 @dp.message(F.text.lower() == "контакты")
@@ -51,7 +50,7 @@ async def command_start_handler(message: Message) -> None:
     :return: None
     """
     # Очистка даты бронирования (если пользователь осуществлял бронирование, после чего написал /start
-    schedule.reset_booking_date()
+    schedule.reset_booking_date(message.chat.id)
     # Вывод приветствия
     start_message: str = "Здравствуйте! Это бот для записи в парикмахерскую N."
     await message.answer(start_message)
@@ -102,7 +101,7 @@ async def choose_date(chat_id: int) -> None:
     :param chat_id: Id чата, в котором происходит выбор даты
     :return: None
     """
-    schedule.reset_booking_date()  # Освобождение переменной, хранящей выбранную дату записи
+    schedule.reset_booking_date(chat_id)  # Освобождение переменной, хранящей выбранную дату записи
 
     closest_free_days = schedule.get_closest_dates(7, schedule.date_have_free_records)  # Выбор подходящих дат
     # Создание клавиатуры с датами
@@ -119,14 +118,14 @@ async def choose_date(chat_id: int) -> None:
 @dp.message(F.text.regexp(r'\d\d\.\d\d\.\d\d\d\d'))
 async def chosen_date_handler(message: Message) -> None:
     """
-    Функция обработки сообщения с выбранной датой. Датой считается любое сообщение в формате r'\d\d\.\d\d\.\d\d\d\d'.
+    Функция обработки сообщения с выбранной датой. Датой считается любое сообщение в формате '\d\d\.\d\d\.\d\d\d\d'.
     Проводит валидацию выбранной даты. Если дата некорректна, перенаправляет на повторный выбор даты.
     Если дата корректна, перенаправляет на выбор времени.
 
     :param message: Пришедшее сообщение.
     :return: None
     """
-    if not schedule.set_booking_date(message.text):  # Если не удалось установить дату записи, например она некорректна
+    if not schedule.set_booking_date(message.chat.id, message.text):  # Если не удалось установить дату записи
         await message.answer("Упс... Кажется, на эту дату записаться нельзя.")  # Вывод ошибки
         await choose_date(message.chat.id)  # Перенаправление на выбор даты
         return
@@ -142,7 +141,7 @@ async def choose_time(chat_id: int) -> None:
     :param chat_id: Id чата, где ведется бронирование
     :return: None
     """
-    free_records = schedule.get_date_records(schedule.any_record)  # Поиск свободных окон в выбранный день
+    free_records = schedule.get_date_records(chat_id, schedule.any_record)  # Поиск свободных окон в выбранный день
     if not free_records:  # Окна не найдены
         # Вывод сообщения об ошибке
         await bot.send_message(chat_id,
@@ -165,14 +164,14 @@ async def choose_time(chat_id: int) -> None:
 @dp.message(F.text.regexp(r'\d\d\:\d\d'))
 async def chosen_time_handler(message: Message) -> None:
     """
-    Обработчик выбранного времени. Временем считается любое сообщение вида r'\d\d\:\d\d'.
+    Обработчик выбранного времени. Временем считается любое сообщение вида '\d\d\:\d\d'.
     Проверяет корректность выбранного времени. Если выбранное время находится в будущем и оно свободно, то бронирует его.
     Иначе выводит сообщение об ошибке, перенаправляет на выбор времени.
 
     :param message: Пришедшее сообщение
     :return: None
     """
-    if not schedule.is_booking_date_set():  # Если не установлена дата записи
+    if not schedule.is_booking_date_set(message.chat.id):  # Если не установлена дата записи
         # Вывод сообщения об ошибке, перенаправление на выбор даты
         await message.answer("Упс... Почему-то не выбрана дата. Попробуйте еще раз")
         await choose_date(message.chat.id)
@@ -182,13 +181,13 @@ async def chosen_time_handler(message: Message) -> None:
         await message.answer("Хмм... Такого времени не существует")
         await choose_time(message.chat.id)
         return
-    if not schedule.is_record_free(message.text):  # Если выбранное окно занято
+    if not schedule.is_record_free(message.chat.id, message.text):  # Если выбранное окно занято
         # Вывод сообщения об ошибке, перенаправление на выбор времени
         await message.answer("К сожалению, нельзя записаться на данное время. Выберите другое")
         await choose_time(message.chat.id)
         return
-    schedule.book_record(message.text)  # Бронирование окна
-    schedule.reset_booking_date()  # Сброс даты бронирования, для следующих броней
+    schedule.book_record(message.chat.id, message.text)  # Бронирование окна
+    schedule.reset_booking_date(message.chat.id)  # Сброс даты бронирования, для следующих броней
     await message.answer("Поздравляю, вы записаны!")  # Поздравительное сообщение
     await show_start_menu(message.chat.id)  # Возвращение к начальному меню
 

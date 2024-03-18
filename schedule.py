@@ -7,41 +7,49 @@ class Schedule:
     """
     Класс для работы с расписанием.
     """
+
     def __init__(self, filename: str) -> None:
-        self.booking_date: Optional[datetime.date] = None  # Дата, на которую пользователь планирует осуществить бронь
+        self.booking_dates: dict[int: datetime.date] = {}  # Словарь дат броней (Id_пользователя: дата брони)
+        # Этот словарь используется для хранения выбранной даты во время брони
+        # После бронирования пользователем, информация о выбранной дате пользователем должна очищаться
         with open(filename, "r") as f:
             self.schedule: dict[str, Any] = json.load(f)  # Расписание
 
-    def reset_booking_date(self) -> None:
+    def reset_booking_date(self, user_id: int) -> None:
         """
-        Очистка даты бронирования.
+        Очистка даты бронирования для пользователя.
 
+        :param user_id: Id пользователя
         :return: None
         """
-        self.booking_date = None
+        if user_id in self.booking_dates:
+            self.booking_dates.pop(user_id)
 
-    def set_booking_date(self, str_date: str) -> bool:
+    def set_booking_date(self, user_id: int, str_date: str) -> bool:
         """
-        Установка даты бронирования.
+        Установка даты бронирования для пользователя.
 
+        :param user_id: Id пользователя
         :param str_date: Дата бронирования в формате строки
         :return: Успешность установки даты
         """
         if not self.is_date_correct(str_date):
             return False
-        self.booking_date = datetime.date(day=int(str_date[:2]), month=int(str_date[3:5]), year=int(str_date[6:]))
-        if not self.is_date_exist():
-            self.reset_booking_date()
+        self.booking_dates[user_id] = datetime.date(day=int(str_date[:2]), month=int(str_date[3:5]),
+                                                    year=int(str_date[6:]))
+        if not self.is_user_date_exist(user_id):
+            self.reset_booking_date(user_id)
             return False
         return True
 
-    def is_booking_date_set(self) -> None:
+    def is_booking_date_set(self, user_id: int) -> bool:
         """
         Функция проверяет, установлена ли дата бронирования.
 
-        :return: None
+        :type user_id: Id пользователя
+        :return: Результат проверки
         """
-        return self.booking_date is not None
+        return user_id in self.booking_dates
 
     @staticmethod
     def is_date_correct(str_date: str) -> bool:
@@ -58,17 +66,18 @@ class Schedule:
         else:
             return True
 
-    def is_date_exist(self) -> bool:
+    def is_user_date_exist(self, user_id: int) -> bool:
         """
-        Функция проверяет, есть ли переданная дата в расписании.
+        Функция проверяет, есть ли дата, выбранная пользователем, в расписании.
 
+        :type user_id: Id пользователя
         :return: None
         """
         try:
-            year_data = self.schedule[str(self.booking_date.year)]
-            month_data = year_data["months"][self.booking_date.month - 1]
-            day_data = month_data["days"][self.booking_date.day - 1]
-            return self.booking_date >= datetime.date.today()
+            year_data = self.schedule[str(self.booking_dates[user_id].year)]
+            month_data = year_data["months"][self.booking_dates[user_id].month - 1]
+            day_data = month_data["days"][self.booking_dates[user_id].day - 1]
+            return self.booking_dates[user_id] >= datetime.date.today()
         except (ValueError, KeyError):
             return False
 
@@ -87,55 +96,58 @@ class Schedule:
         else:
             return True
 
-    def get_date_records(self, sort_filter: Callable[[dict[str, Any]], bool]) -> tuple[str, ...]:
+    def get_date_records(self, user_id: int, sort_filter: Callable[[dict[str, Any]], bool]) -> tuple[str, ...]:
         """
         Функция возвращает кортеж записей, которые удовлетворяют фильтру sort_filter, а также их дата - дата
-        бронирования
+        бронирования. Выбранная пользователем дата передается в словаре self.booking_dates.
 
+        :param user_id: Id пользователя
         :param sort_filter: Функция-фильтр
         :return: Выбранные записи
         """
-        if self.booking_date is None:
+        if user_id not in self.booking_dates:
             return tuple()
         result: list[str] = []
-        year_data = self.schedule[str(self.booking_date.year)]
-        month_data = year_data["months"][self.booking_date.month - 1]
-        day_data = month_data["days"][self.booking_date.day - 1]
+        year_data = self.schedule[str(self.booking_dates[user_id].year)]
+        month_data = year_data["months"][self.booking_dates[user_id].month - 1]
+        day_data = month_data["days"][self.booking_dates[user_id].day - 1]
         for record_time, record_state in day_data["records"].items():
             if record_state == 0:
                 result.append(record_time)
         return tuple(result)
 
-    def book_record(self, str_time: str) -> bool:
+    def book_record(self, user_id: int, str_time: str) -> bool:
         """
-        Функция бронирует запись. Время брони передается. Дата брони хранится в self.booking_date.
+        Функция бронирует запись. Время брони передается. Дата брони хранится в self.booking_dates.
 
+        :param user_id: Id пользователя
         :param str_time: Время брони
         :return: Успешность бронирования
         """
         if not self.is_time_correct(str_time):
             return False
         try:
-            year_data = self.schedule[str(self.booking_date.year)]
-            month_data = year_data["months"][self.booking_date.month - 1]
-            day_data = month_data["days"][self.booking_date.day - 1]
+            year_data = self.schedule[str(self.booking_dates[user_id].year)]
+            month_data = year_data["months"][self.booking_dates[user_id].month - 1]
+            day_data = month_data["days"][self.booking_dates[user_id].day - 1]
             day_data["records"][str_time] = 1
             return True
         except (ValueError, KeyError):
             return False
 
-    def is_record_free(self, str_time: str) -> bool:
+    def is_record_free(self, user_id: int, str_time: str) -> bool:
         """
-        Проверяет, можно ли записаться на данное время.
+        Проверяет, можно ли записаться на данное время. Дата хранится в словаре self.booking_dates.
 
+        :param user_id: Id пользователя
         :param str_time: Время
         :return: Свободно ли окно
         """
         try:
-            year_data = self.schedule[str(self.booking_date.year)]
-            month_data = year_data["months"][self.booking_date.month - 1]
-            day_data = month_data["days"][self.booking_date.day - 1]
-            is_future = self.booking_date > datetime.date.today() or \
+            year_data = self.schedule[str(self.booking_dates[user_id].year)]
+            month_data = year_data["months"][self.booking_dates[user_id].month - 1]
+            day_data = month_data["days"][self.booking_dates[user_id].day - 1]
+            is_future = self.booking_dates[user_id] > datetime.date.today() or \
                         datetime.datetime.strptime(str_time, "%H:%M").time() > datetime.datetime.now().time()
             return is_future and day_data["records"][str_time] == 0
         except (ValueError, KeyError):
