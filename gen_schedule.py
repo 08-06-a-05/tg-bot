@@ -1,11 +1,13 @@
 import calendar
-# import time
 import datetime
 import json
 import random
 
 
 class RecordStates:
+    """
+    Вероятности получения записи определенного статуса.
+    """
     free_prob = 0.59
     busy_prob = free_prob + 0.35
     not_available = busy_prob + 0.05
@@ -22,6 +24,13 @@ class RecordStates:
 
 
 def gen_day_schedule(is_workday: bool, date_range: datetime.timedelta) -> dict[str, int]:
+    """
+    Генерация дня расписания. Каждая запись с вероятностью, описанными в RecordStates, получает статус.
+
+    :param is_workday: Является ли день рабочим
+    :param date_range: Сколько дней должны иметь занятые записи
+    :return: Расписание на день
+    """
     day_schedule = {}
     if is_workday and date_range.days < 50:
         for i in range(7):
@@ -40,9 +49,16 @@ def gen_day_schedule(is_workday: bool, date_range: datetime.timedelta) -> dict[s
 
 
 def is_workday(day_index: int) -> bool:
+    """
+    Проверка, является ли день рабочим. Праздники не учитываются. Не рабочий день - воскресенье.
+
+    :param day_index: Номер дня в неделе - 1 (т.е. понедельник = 0, ..., воскресенье = 6)
+    :return: Статус дня
+    """
     return day_index <= 5
 
 
+# Создание расписания
 now = calendar.Calendar()
 new_c = now.yeardayscalendar(2024, width=12)
 schedule = {"2024": {"months": []}}
