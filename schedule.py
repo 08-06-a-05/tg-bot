@@ -54,7 +54,7 @@ class Schedule:
     @staticmethod
     def is_date_correct(str_date: str) -> bool:
         """
-        Функция проверяет, существует ли дата, переданная в виде строки
+        Функция проверяет, существует ли дата, переданная в виде строки.
 
         :param str_date: Дата
         :return: Результат проверки
@@ -84,7 +84,7 @@ class Schedule:
     @staticmethod
     def is_time_correct(str_time: str) -> bool:
         """
-        Функция проверяет, существует ли переданное в виде строки время
+        Функция проверяет, существует ли переданное в виде строки время.
 
         :param str_time: Время
         :return: Результат проверки
@@ -96,7 +96,7 @@ class Schedule:
         else:
             return True
 
-    def get_date_records(self, user_id: int, sort_filter: Callable[[dict[str, Any]], bool]) -> tuple[str, ...]:
+    def get_date_records(self, user_id: int, sort_filter: Callable[[str, int], bool]) -> tuple[str, ...]:
         """
         Функция возвращает кортеж записей, которые удовлетворяют фильтру sort_filter, а также их дата - дата
         бронирования. Выбранная пользователем дата передается в словаре self.booking_dates.
@@ -112,7 +112,7 @@ class Schedule:
         month_data = year_data["months"][self.booking_dates[user_id].month - 1]
         day_data = month_data["days"][self.booking_dates[user_id].day - 1]
         for record_time, record_state in day_data["records"].items():
-            if record_state == 0:
+            if sort_filter(record_time, record_state):
                 result.append(record_time)
         return tuple(result)
 
@@ -181,6 +181,17 @@ class Schedule:
         :return: True всегда
         """
         return True
+
+    @staticmethod
+    def free_record(str_time: str, str_state: int) -> bool:
+        """
+        Функция фильтр. Запись должна быть свободна.
+
+        :param str_time: Время записи
+        :param str_state: Состояние записи
+        :return: Результат проверки
+        """
+        return str_state == 0
 
     @staticmethod
     def date_have_free_records(date_info: dict[str, Any]) -> bool:

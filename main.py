@@ -11,12 +11,8 @@ from aiogram.utils.keyboard import ReplyKeyboardBuilder
 
 from schedule import Schedule
 
-# TODO: Добавить проверку корректности дат (Только протестировать)
-#   Проверка, что записываемся на будущее, а не на прошлое (Только протестировать)
-#   Написать аннотации, комментарии
-#   Заменить фильтр any_record на что-нибудь нормальное
+# TODO:
 #   Добавить использование множеств
-#   Поправить, что дату брони надо хранить в словаре с id чата (Только протестировать)
 
 
 with open("config.txt", "r") as f:  # Получение токена бота
@@ -141,7 +137,7 @@ async def choose_time(chat_id: int) -> None:
     :param chat_id: Id чата, где ведется бронирование
     :return: None
     """
-    free_records = schedule.get_date_records(chat_id, schedule.any_record)  # Поиск свободных окон в выбранный день
+    free_records = schedule.get_date_records(chat_id, schedule.free_record)  # Поиск свободных окон в выбранный день
     if not free_records:  # Окна не найдены
         # Вывод сообщения об ошибке
         await bot.send_message(chat_id,
