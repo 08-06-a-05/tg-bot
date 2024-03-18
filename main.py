@@ -12,10 +12,6 @@ from aiogram.utils.keyboard import ReplyKeyboardBuilder
 
 from schedule import Schedule
 
-# TODO:
-#   Добавить использование множеств
-#   Добавить кнопку возвращения в главное меню из любого действия (Протестировать)
-
 
 with open("config.txt", "r") as f:  # Получение токена бота
     TOKEN: str = f.readline()
