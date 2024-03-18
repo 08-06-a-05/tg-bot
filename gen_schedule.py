@@ -18,9 +18,9 @@ class RecordStates:
         if cur_state < cls.free_prob:
             return 0
         elif cur_state < cls.busy_prob:
-            return 1
+            return random.randint(1_000_000, 4_000_000)
         else:
-            return 2
+            return -1
 
 
 def gen_day_schedule(is_workday: bool, date_range: datetime.timedelta) -> dict[str, int]:

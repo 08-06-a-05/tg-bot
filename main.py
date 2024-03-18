@@ -4,6 +4,7 @@ import sys
 
 from aiogram import Bot, Dispatcher, types
 from aiogram import F
+from aiogram.client.bot import DefaultBotProperties
 from aiogram.enums import ParseMode
 from aiogram.filters import CommandStart
 from aiogram.types import Message
@@ -18,7 +19,7 @@ from schedule import Schedule
 
 with open("config.txt", "r") as f:  # Получение токена бота
     TOKEN: str = f.readline()
-    bot = Bot(TOKEN, parse_mode=ParseMode.HTML)  # Объект бота
+    bot = Bot(TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))  # Объект бота
 
 dp = Dispatcher()  # Обработчик пришедших сообщений
 schedule = Schedule("schedule.json")  # Класс для работы с расписанием, в том числе бронирования
@@ -63,6 +64,7 @@ async def show_contacts_handler(message: Message) -> None:
     :param message: Сообщение, пришедшее от пользователя
     :return: None
     """
+    schedule.reset_booking_date(message.chat.id)  # Освобождение переменной, хранящей выбранную дату записи
     # Вывод контактов
     await show_start_menu(message.chat.id)  # Возвращение на меню действий
 
@@ -187,21 +189,19 @@ async def chosen_time_handler(message: Message) -> None:
         # Вывод сообщения об ошибке, перенаправление на выбор даты
         await message.answer("Упс... Почему-то не выбрана дата. Попробуйте еще раз")
         await choose_date(message.chat.id)
-        return
-    if not schedule.is_time_correct(message.text):  # Если выбранное время не существует вообще (например 25:61)
+    elif not schedule.is_time_correct(message.text):  # Если выбранное время не существует вообще (например 25:61)
         # Вывод сообщения об ошибке, перенаправление на выбор времени
         await message.answer("Хмм... Такого времени не существует")
         await choose_time(message.chat.id)
-        return
-    if not schedule.is_record_free(message.chat.id, message.text):  # Если выбранное окно занято
+    elif not schedule.is_record_free(message.chat.id, message.text):  # Если выбранное окно занято
         # Вывод сообщения об ошибке, перенаправление на выбор времени
         await message.answer("К сожалению, нельзя записаться на данное время. Выберите другое")
         await choose_time(message.chat.id)
-        return
-    schedule.book_record(message.chat.id, message.text)  # Бронирование окна
-    schedule.reset_booking_date(message.chat.id)  # Сброс даты бронирования, для следующих броней
-    await message.answer("Поздравляю, вы записаны!")  # Поздравительное сообщение
-    await show_start_menu(message.chat.id)  # Возвращение к начальному меню
+    else:  # Иначе все хорошо
+        schedule.book_record(message.chat.id, message.text)  # Бронирование окна
+        schedule.reset_booking_date(message.chat.id)  # Сброс даты бронирования, для следующих броней
+        await message.answer("Поздравляю, вы записаны!")  # Поздравительное сообщение
+        await show_start_menu(message.chat.id)  # Возвращение к начальному меню
 
 
 async def main() -> None:

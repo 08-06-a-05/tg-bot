@@ -1,6 +1,6 @@
 import datetime
 import json
-from typing import Callable, Any, Optional
+from typing import Callable, Any
 
 
 class Schedule:
@@ -17,6 +17,9 @@ class Schedule:
         self.booking_dates: dict[int: datetime.date] = {}  # Словарь дат броней (Id_пользователя: дата брони)
         # Этот словарь используется для хранения выбранной даты во время брони
         # После бронирования пользователем, информация о выбранной дате пользователем должна очищаться
+
+        # Информация, о пользователях, которые недавно сделали бронь (чтобы менеджер смог с ними связаться)
+        self.booked_users_id: set[int] = set()
         with open(filename, "r") as f:
             self.schedule: dict[str, Any] = json.load(f)  # Расписание
 
@@ -79,6 +82,7 @@ class Schedule:
         :return: None
         """
         try:
+            # Переменные для доступа к записи, используются для лучшей читабельности
             year_data = self.schedule[str(self.booking_dates[user_id].year)]
             month_data = year_data["months"][self.booking_dates[user_id].month - 1]
             day_data = month_data["days"][self.booking_dates[user_id].day - 1]
@@ -101,7 +105,7 @@ class Schedule:
         else:
             return True
 
-    def get_date_records(self, user_id: int, sort_filter: Callable[[str, int], bool]) -> tuple[str, ...]:
+    def get_date_records(self, user_id: int, sort_filter: Callable[[str, datetime.date, int], bool]) -> tuple[str, ...]:
         """
         Функция возвращает кортеж записей, которые удовлетворяют фильтру sort_filter, а также их дата - дата
         бронирования. Выбранная пользователем дата передается в словаре self.booking_dates.
@@ -112,13 +116,14 @@ class Schedule:
         """
         if user_id not in self.booking_dates:
             return tuple()
-        result: list[str] = []
+        result: list[str] = []  # Список для сбора подходящих записей
+        # Переменные для доступа к записи, используются для лучшей читабельности
         year_data = self.schedule[str(self.booking_dates[user_id].year)]
         month_data = year_data["months"][self.booking_dates[user_id].month - 1]
         day_data = month_data["days"][self.booking_dates[user_id].day - 1]
-        for record_time, record_state in day_data["records"].items():
-            if sort_filter(record_time, record_state):
-                result.append(record_time)
+        for record_time, record_state in day_data["records"].items():  # Перебор записей
+            if sort_filter(record_time, self.booking_dates[user_id], record_state):  # Если запись соответсвует фильтру
+                result.append(record_time)  # Добавить её
         return tuple(result)
 
     def book_record(self, user_id: int, str_time: str) -> bool:
@@ -132,10 +137,12 @@ class Schedule:
         if not self.is_time_correct(str_time):
             return False
         try:
+            # Переменные для доступа к записи, используются для лучшей читабельности
             year_data = self.schedule[str(self.booking_dates[user_id].year)]
             month_data = year_data["months"][self.booking_dates[user_id].month - 1]
             day_data = month_data["days"][self.booking_dates[user_id].day - 1]
-            day_data["records"][str_time] = 1
+            day_data["records"][str_time] = user_id  # Бронирование записи
+            self.booked_users_id.add(user_id)  # Добавление id клиента в множество недавно бронировавших
             return True
         except (ValueError, KeyError):
             return False
@@ -149,12 +156,18 @@ class Schedule:
         :return: Свободно ли окно
         """
         try:
+            # Переменные для доступа к записи, используются для лучшей читабельности
             year_data = self.schedule[str(self.booking_dates[user_id].year)]
             month_data = year_data["months"][self.booking_dates[user_id].month - 1]
             day_data = month_data["days"][self.booking_dates[user_id].day - 1]
+            # Бронируемое время - в будущем или нет? Если нет - то забронировать его будет невозможно
             is_future = self.booking_dates[user_id] > datetime.date.today() or \
-                        datetime.datetime.strptime(str_time, "%H:%M").time() > datetime.datetime.now().time()
-            return is_future and day_data["records"][str_time] == 0
+                        (self.booking_dates[user_id] == datetime.date.today() and \
+                         datetime.datetime.strptime(str_time, "%H:%M").time() > datetime.datetime.now().time())
+            if is_future and day_data["records"][str_time] == 0:
+                return True
+            else:
+                return False
         except (ValueError, KeyError):
             return False
 
@@ -188,15 +201,19 @@ class Schedule:
         return True
 
     @staticmethod
-    def free_record(str_time: str, str_state: int) -> bool:
+    def free_record(str_time: str, date: datetime.date, str_state: int) -> bool:
         """
-        Функция фильтр. Запись должна быть свободна.
+        Функция фильтр. Запись должна быть свободна. Запись должна быть в будущем.
 
         :param str_time: Время записи
         :param str_state: Состояние записи
         :return: Результат проверки
         """
-        return str_state == 0
+        # В будущем ли бронируемое время
+        is_future = date > datetime.date.today() or \
+                    (date == datetime.date.today() and \
+                     datetime.datetime.strptime(str_time, "%H:%M").time() > datetime.datetime.now().time())
+        return is_future and str_state == 0
 
     @staticmethod
     def date_have_free_records(date_info: dict[str, Any]) -> bool:
@@ -206,8 +223,13 @@ class Schedule:
         :param date_info: Информация о дате
         :return: Результат фильтрации
         """
-        for record_state in date_info["records"].values():
-            if record_state == 0:
+        for record_time, record_state in date_info["records"].items():
+            is_future = datetime.datetime.strptime(date_info["date"],
+                                                   "%d.%m.%Y").date() > datetime.datetime.now().date() or \
+                        (datetime.datetime.strptime(date_info["date"],
+                                                    "%d.%m.%Y").date() == datetime.datetime.now().date() and
+                         datetime.datetime.strptime(record_time, "%H:%M").time() > datetime.datetime.now().time())
+            if record_state == 0 and is_future:
                 return True
         return False
 
