@@ -13,6 +13,7 @@ from schedule import Schedule
 
 # TODO:
 #   Добавить использование множеств
+#   Добавить кнопку возвращения в главное меню из любого действия (Протестировать)
 
 
 with open("config.txt", "r") as f:  # Получение токена бота
@@ -52,6 +53,18 @@ async def command_start_handler(message: Message) -> None:
     await message.answer(start_message)
     # Вывод меню действий
     await show_start_menu(message.chat.id)
+
+
+@dp.message(F.text.lower() == "меню")
+async def show_contacts_handler(message: Message) -> None:
+    """
+    Обработчик сообщения "Меню". Возвращает пользователя на меню действий
+
+    :param message: Сообщение, пришедшее от пользователя
+    :return: None
+    """
+    # Вывод контактов
+    await show_start_menu(message.chat.id)  # Возвращение на меню действий
 
 
 async def show_start_menu(chat_id: int) -> None:
@@ -104,6 +117,7 @@ async def choose_date(chat_id: int) -> None:
     builder = ReplyKeyboardBuilder()
     for day in closest_free_days:
         builder.add(types.KeyboardButton(text=str(day["date"])))
+    builder.add(types.KeyboardButton(text="Меню"))
     builder.adjust(3)
     # Отправка сообщения
     await bot.send_message(chat_id=chat_id,
@@ -114,7 +128,8 @@ async def choose_date(chat_id: int) -> None:
 @dp.message(F.text.regexp(r'\d\d\.\d\d\.\d\d\d\d'))
 async def chosen_date_handler(message: Message) -> None:
     """
-    Функция обработки сообщения с выбранной датой. Датой считается любое сообщение в формате '\d\d\.\d\d\.\d\d\d\d'.
+    Функция обработки сообщения с выбранной датой. Датой считается любое сообщение в формате:
+    '[0-9][0-9].[0-9][0-9].[0-9][0-9][0-9][0-9]'.
     Проводит валидацию выбранной даты. Если дата некорректна, перенаправляет на повторный выбор даты.
     Если дата корректна, перенаправляет на выбор времени.
 
@@ -149,6 +164,7 @@ async def choose_time(chat_id: int) -> None:
     for record_time in free_records:
         builder.add(types.KeyboardButton(text=record_time))
     builder.add(types.KeyboardButton(text="Выбрать другую дату"))
+    builder.add(types.KeyboardButton(text="Меню"))
     builder.adjust(3)
     # Отправка ответа пользователю
     await bot.send_message(chat_id,
@@ -160,7 +176,7 @@ async def choose_time(chat_id: int) -> None:
 @dp.message(F.text.regexp(r'\d\d\:\d\d'))
 async def chosen_time_handler(message: Message) -> None:
     """
-    Обработчик выбранного времени. Временем считается любое сообщение вида '\d\d\:\d\d'.
+    Обработчик выбранного времени. Временем считается любое сообщение вида '[0-9][0-9]:[0-9][0-9]'.
     Проверяет корректность выбранного времени. Если выбранное время находится в будущем и оно свободно, то бронирует его.
     Иначе выводит сообщение об ошибке, перенаправляет на выбор времени.
 
