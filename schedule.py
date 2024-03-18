@@ -74,7 +74,7 @@ class Schedule:
             day_data = month_data["days"][self.booking_date.day - 1]
             day_data["records"][str_time] = 1
             return True
-        except ValueError or KeyError:
+        except (ValueError, KeyError):
             return False
 
     def is_record_free(self, time: str) -> bool:
@@ -85,7 +85,7 @@ class Schedule:
             is_future = self.booking_date > datetime.date.today() or \
                         datetime.datetime.strptime(time, "%H:%M").time() > datetime.datetime.now().time()
             return is_future and day_data["records"][time] == 0
-        except ValueError or KeyError:
+        except (ValueError, KeyError):
             return False
 
     def get_closest_dates(self, days_range: int, sort_filter: Callable[[dict[str, Any]], bool]):
